@@ -61,6 +61,7 @@ pub fn compare_and_swap<T, F>(x: &mut [T], forward: bool, comparator: &F)
 mod tests {
     use super::{sort, sort_by};
     use crate::SortOrder::*;
+    use crate::utils::{new_u32_vec, is_sorted_ascending, is_sorted_descending};
 
     #[test]
     fn sort_u32_ascending() {
@@ -154,5 +155,19 @@ mod tests {
         );
 
         assert_eq!(x, expected);
+    }
+
+    #[test]
+    fn sort_u32_large() {
+        {
+            let mut x = new_u32_vec(65536);
+            assert_eq!(sort(&mut x, &Ascending), Ok(()));
+            assert!(is_sorted_ascending(&x));
+        }
+        {
+            let mut x = new_u32_vec(65536);
+            assert_eq!(sort(&mut x, &Descending), Ok(()));
+            assert!(is_sorted_descending(&x));
+        }
     }
 }
