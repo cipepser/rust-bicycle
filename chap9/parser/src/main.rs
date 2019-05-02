@@ -146,22 +146,23 @@ fn lex_number(input: &[u8], mut pos: usize) -> (Token, usize) {
     use std::str::from_utf8;
 
     let start = pos;
-    while pos < input.len() && b"1234567890".contains((&input[pos])) {
-        pos += 1;
-    }
+    let end = recognize_many(input, start, |b| b"1234567890".contains(&b));
 
-    let n = from_utf8(&input[start..pos])
+    let n = from_utf8(&input[start..end])
         .unwrap() // 事前のエラーチェックで常に成功する
         .parse()
         .unwrap();
-    (Token::number(n, Loc(start, pos)), pos)
+    (Token::number(n, Loc(start, end)), end)
 }
 
 fn skip_spaces(input: &[u8], mut pos: usize) -> ((), usize) {
-    while pos < input.len() && b" \n\t".contains(&input[pos]) {
-        pos += 1;
-    }
-
+    let pos = recognize_many(input, start, |b| b" \n\t".contains(&b));
     ((), pos)
 }
 
+fn recognize_many(input: &[u8], mut pos: usize, mut f: impl FnMut(u8) -> bool) -> usize {
+    while pos < input.len() && f(input[pos]) {
+        pos += 1;
+    }
+    pos
+}
