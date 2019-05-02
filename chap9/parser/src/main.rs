@@ -1,3 +1,6 @@
+use std::io;
+use std::io::stdin;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Loc(usize, usize);
 
@@ -20,6 +23,7 @@ impl<T> Annot<T> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum TokenKind {
     Number(u64),
     Plus,
@@ -88,7 +92,7 @@ fn lex(input: &str) -> Result<Vec<Token>, LexError> {
         match input[pos] {
             b'0'...b'9' => lex_a_token!(lex_number(input, pos)),
             b'+' => lex_a_token!(lex_plus(input, pos)),
-            b'-' => lex_a_token!(lex_minux(input, pos)),
+            b'-' => lex_a_token!(lex_minus(input, pos)),
             b'*' => lex_a_token!(lex_asterisk(input, pos)),
             b'/' => lex_a_token!(lex_slash(input, pos)),
             b'(' => lex_a_token!(lex_lparen(input, pos)),
@@ -142,7 +146,7 @@ fn lex_rparen(input: &[u8], start: usize) -> Result<(Token, usize), LexError> {
     consume_byte(input, start, b')').map(|(_, end)| (Token::rparen(Loc(start, end)), end))
 }
 
-fn lex_number(input: &[u8], mut pos: usize) -> (Token, usize) {
+fn lex_number(input: &[u8], mut pos: usize) -> Result<(Token, usize), LexError> {
     use std::str::from_utf8;
 
     let start = pos;
@@ -152,12 +156,12 @@ fn lex_number(input: &[u8], mut pos: usize) -> (Token, usize) {
         .unwrap() // 事前のエラーチェックで常に成功する
         .parse()
         .unwrap();
-    (Token::number(n, Loc(start, end)), end)
+    Ok((Token::number(n, Loc(start, end)), end))
 }
 
-fn skip_spaces(input: &[u8], mut pos: usize) -> ((), usize) {
-    let pos = recognize_many(input, start, |b| b" \n\t".contains(&b));
-    ((), pos)
+fn skip_spaces(input: &[u8], mut pos: usize) -> Result<((), usize), LexError> {
+    let pos = recognize_many(input, pos, |b| b" \n\t".contains(&b));
+    Ok(((), pos))
 }
 
 fn recognize_many(input: &[u8], mut pos: usize, mut f: impl FnMut(u8) -> bool) -> usize {
@@ -165,4 +169,48 @@ fn recognize_many(input: &[u8], mut pos: usize, mut f: impl FnMut(u8) -> bool) -
         pos += 1;
     }
     pos
+}
+
+#[test]
+fn test_lexer() {
+    assert_eq!(
+        lex("1 + 2 * 3 - -10"),
+        Ok(vec![
+            Token::number(1, Loc(0, 1)),
+            Token::plus(Loc(2, 3)),
+            Token::number(2, Loc(4, 5)),
+            Token::asterisk(Loc(6, 7)),
+            Token::number(3, Loc(8, 9)),
+            Token::minus(Loc(10, 11)),
+            Token::minus(Loc(12, 13)),
+            Token::number(10, Loc(13, 15)),
+        ])
+    );
+}
+
+fn prompt(s: &str) -> io::Result<()> {
+    use std::io::{stdout, Write};
+    let stdout = stdout();
+    let mut stdout = stdout.lock();
+    stdout.write(s.as_bytes())?;
+    stdout.flush()
+}
+
+fn main() {
+    use std::io::{stdin, BufRead, BufReader};
+
+    let stdin = stdin();
+    let stdin = stdin.lock();
+    let stdin = BufReader::new(stdin);
+    let mut lines = stdin.lines();
+
+    loop {
+        prompt("> ").unwrap();
+        if let Some(Ok(line)) = lines.next() {
+            let token = lex(&line);
+            println!("{:?}", token);
+        } else {
+            break;
+        }
+    }
 }
