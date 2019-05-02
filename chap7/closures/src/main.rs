@@ -38,4 +38,11 @@ fn main() {
 //    apply_fn_mut(&mut consume, 'c'); // error[E0525]: expected a closure that implements the `FnMut` trait, but this closure only implements `FnOnce`
     apply_fn_once(consume, 'd');
 //    assert_eq!(s3, "error"); // error[E0382]: borrow of moved value: `s3`
+
+//    let lookup = || assert!(s1.find('d').is_some());
+//    let handle = std::thread::spawn(lookup);
+    //error[E0373]: closure may outlive the current function, but it borrows `s1`, which is owned by the current function
+
+    let lookup = move || assert!(s1.find('d').is_some());
+    let handle = std::thread::spawn(lookup);
 }
