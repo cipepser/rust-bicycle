@@ -1,5 +1,6 @@
 use std::io;
 use std::io::stdin;
+use std::iter::Peekable;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Loc(usize, usize);
@@ -288,4 +289,49 @@ enum ParseError {
     UnclosedOpenParen(Token),
     RedundantExpression(Token),
     Eof,
+}
+
+fn parse(tokens: Vec<Token>) -> Result<Ast, ParseError> {
+    let mut tokens = tokens.into_iter().peekable();
+    let ret = parse_expr(&mut tokens)?;
+    match tokens.next() {
+        Some(tok) => Err(ParseError::RedundantExpression(tok)),
+        None => Ok(ret),
+    }
+}
+
+fn parse_expr<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Ast, ParseError>
+    where Tokens: Iterator<Item=Token>,
+{
+    parse_expr3(tokens)
+}
+
+fn parse_expr3<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Ast, ParseError>
+    where Tokens: Iterator<Item=Token>,
+{
+    match parse_expr3(tokens) {
+        Err(_) => parse_expr2(tokens),
+        Ok(e) => {
+            match tokens.peek().map(|tok| tok.value) {
+                Some(TokenKind::Plus) | Some(TokenKind::Minus) => {
+                    let op = match tokens.next().unwrap() {
+                        Token {
+                            value: TokenKind::Plus,
+                            loc,
+                        } => BinOp::add(loc),
+                        Token {
+                            value: TokenKind::Minus,
+                            loc,
+                        } => BinOp::sub(loc),
+                        _ => unreachable!(),
+                    };
+                    let r = parse_expr2(tokens)?;
+                    let loc = e.loc.merge(&r.loc);
+                    Ok(Ast::binop(op, e, r, loc))
+                }
+                Some(_) => Err(ParseError::UnexpectedToken(tokens.next().unwrap())),
+                None => Err(ParseError::Eof),
+            }
+        }
+    }
 }
