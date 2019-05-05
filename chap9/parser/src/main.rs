@@ -1,7 +1,3 @@
-use std::io;
-use std::io::stdin;
-use std::iter::Peekable;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Loc(usize, usize);
 
@@ -24,7 +20,7 @@ impl<T> Annot<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum TokenKind {
     Number(u64),
     Plus,
@@ -147,7 +143,7 @@ fn lex_rparen(input: &[u8], start: usize) -> Result<(Token, usize), LexError> {
     consume_byte(input, start, b')').map(|(_, end)| (Token::rparen(Loc(start, end)), end))
 }
 
-fn lex_number(input: &[u8], mut pos: usize) -> Result<(Token, usize), LexError> {
+fn lex_number(input: &[u8], pos: usize) -> Result<(Token, usize), LexError> {
     use std::str::from_utf8;
 
     let start = pos;
@@ -160,7 +156,7 @@ fn lex_number(input: &[u8], mut pos: usize) -> Result<(Token, usize), LexError> 
     Ok((Token::number(n, Loc(start, end)), end))
 }
 
-fn skip_spaces(input: &[u8], mut pos: usize) -> Result<((), usize), LexError> {
+fn skip_spaces(input: &[u8], pos: usize) -> Result<((), usize), LexError> {
     let pos = recognize_many(input, pos, |b| b" \n\t".contains(&b));
     Ok(((), pos))
 }
@@ -187,33 +183,6 @@ fn test_lexer() {
             Token::number(10, Loc(13, 15)),
         ])
     );
-}
-
-fn prompt(s: &str) -> io::Result<()> {
-    use std::io::{stdout, Write};
-    let stdout = stdout();
-    let mut stdout = stdout.lock();
-    stdout.write(s.as_bytes())?;
-    stdout.flush()
-}
-
-fn main() {
-    use std::io::{stdin, BufRead, BufReader};
-
-    let stdin = stdin();
-    let stdin = stdin.lock();
-    let stdin = BufReader::new(stdin);
-    let mut lines = stdin.lines();
-
-    loop {
-        prompt("> ").unwrap();
-        if let Some(Ok(line)) = lines.next() {
-            let token = lex(&line);
-            println!("{:?}", token);
-        } else {
-            break;
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -291,6 +260,8 @@ enum ParseError {
     Eof,
 }
 
+use std::iter::Peekable;
+
 fn parse(tokens: Vec<Token>) -> Result<Ast, ParseError> {
     let mut tokens = tokens.into_iter().peekable();
     let ret = parse_expr(&mut tokens)?;
@@ -309,31 +280,6 @@ fn parse_expr<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Ast, ParseError>
 fn parse_expr3<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Ast, ParseError>
     where Tokens: Iterator<Item=Token>,
 {
-    //    let mut e = parse_expr2(tokens)?;
-//
-//    loop {
-//        match tokens.peek().map(|tok| tok.value) {
-//            Some(TokenKind::Plus) | Some(TokenKind::Minus) => {
-//                let op = match tokens.next().unwrap() {
-//                    Token {
-//                        value: TokenKind::Plus,
-//                        loc,
-//                    } => BinOp::add(loc),
-//                    Token {
-//                        value: TokenKind::Minus,
-//                        loc,
-//                    } => BinOp::sub(loc),
-//                    _ => unreachable!(),
-//                };
-//                let r = parse_expr2(tokens)?;
-//
-//                let loc = e.loc.merge(&r.loc);
-//                Ok(Ast::binop(op, e, r, loc))
-//            }
-//            _ => return Ok(e),
-//        }
-//    }
-
     fn parser_expr3_op<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<BinOp, ParseError>
         where Tokens: Iterator<Item=Token>
     {
@@ -349,35 +295,51 @@ fn parse_expr3<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Ast, ParseError>
         Ok(op)
     }
 
-    parse_left_binop(tokens, parse_expr2, parser_expr3_op());
+    parse_left_binop(tokens, parse_expr2, parser_expr3_op)
 }
 
 fn parse_expr2<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Ast, ParseError>
     where Tokens: Iterator<Item=Token>,
 {
-    let mut e = parse_expr1(tokens)?;
+    fn parser_expr2_op<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<BinOp, ParseError>
+        where Tokens: Iterator<Item=Token>
+    {
+        let op = tokens
+            .peek()
+            .ok_or(ParseError::Eof)
+            .and_then(|tok| match tok.value {
+                TokenKind::Asterisk => Ok(BinOp::mult(tok.loc.clone())),
+                TokenKind::Slash => Ok(BinOp::div(tok.loc.clone())),
+                _ => Err(ParseError::NotOperator(tok.clone())),
+            })?;
+        tokens.next();
+        Ok(op)
+    }
 
-    loop {
-        match tokens.peek().map(|tok| tok.value) {
-            Some(TokenKind::Asterisk) | Some(TokenKind::Slash) => {
-                let op = match tokens.next().unwrap() {
-                    Token {
-                        value: TokenKind::Asterisk,
-                        loc,
-                    } => BinOp::mult(loc),
-                    Token {
-                        value: TokenKind::Slash,
-                        loc,
-                    } => BinOp::div(loc),
-                    _ => unreachable!(),
-                };
-                let r = parse_expr1(tokens)?;
+    parse_left_binop(tokens, parse_expr1, parser_expr2_op)
+}
 
-                let loc = e.loc.merge(&r.loc);
-                Ok(Ast::binop(op, e, r, loc))
-            }
-            _ => return Ok(e),
+fn parse_expr1<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Ast, ParseError>
+    where Tokens: Iterator<Item=Token>,
+{
+    match tokens.peek().map(|tok| tok.value) {
+        Some(TokenKind::Plus) | Some(TokenKind::Minus) => {
+            let op = match tokens.next() {
+                Some(Token {
+                         value: TokenKind::Plus,
+                         loc,
+                     }) => UniOp::plus(loc),
+                Some(Token {
+                         value: TokenKind::Minus,
+                         loc,
+                     }) => UniOp::minus(loc),
+                _ => unreachable!(),
+            };
+            let e = parse_atom(tokens)?;
+            let loc = op.loc.merge(&e.loc);
+            Ok(Ast::uniop(op, e, loc))
         }
+        _ => parse_atom(tokens),
     }
 }
 
@@ -404,4 +366,94 @@ fn parse_left_binop<Tokens>(
         }
     }
     Ok(e)
+}
+
+fn parse_atom<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Ast, ParseError>
+    where Tokens: Iterator<Item=Token>
+{
+    tokens
+        .next()
+        .ok_or(ParseError::Eof)
+        .and_then(|tok| match tok.value {
+            TokenKind::Number(n) => Ok(Ast::new(AstKind::Num(n), tok.loc)),
+            TokenKind::LParen => {
+                let e = parse_expr(tokens)?;
+                match tokens.next() {
+                    Some(Token {
+                             value: TokenKind::RParen,
+                             ..
+                         }) => Ok(e),
+                    Some(t) => Err(ParseError::RedundantExpression(t)),
+                    _ => Err(ParseError::UnclosedOpenParen(tok)),
+                }
+            }
+            _ => Err(ParseError::NotExpression(tok))
+        })
+}
+
+#[test]
+fn test_parser() {
+    // 1 + 2 * 3 - - 10
+    let ast = parse(vec![
+        Token::number(1, Loc(0, 1)),
+        Token::plus(Loc(2, 3)),
+        Token::number(2, Loc(4, 5)),
+        Token::asterisk(Loc(6, 7)),
+        Token::number(3, Loc(8, 9)),
+        Token::minus(Loc(10, 11)),
+        Token::minus(Loc(12, 13)),
+        Token::number(10, Loc(13, 15)),
+    ]);
+    assert_eq!(
+        ast,
+        Ok(Ast::binop(
+            BinOp::sub(Loc(10, 11)),
+            Ast::binop(
+                BinOp::add(Loc(2, 3)),
+                Ast::num(1, Loc(0, 1)),
+                Ast::binop(
+                    BinOp::new(BinOpKind::Mult, Loc(6, 7)),
+                    Ast::num(2, Loc(4, 5)),
+                    Ast::num(3, Loc(8, 9)),
+                    Loc(4, 9),
+                ),
+                Loc(0, 9),
+            ),
+            Ast::uniop(
+                UniOp::minus(Loc(12, 13)),
+                Ast::num(10, Loc(13, 15)),
+                Loc(12, 15),
+            ),
+            Loc(0, 15),
+        ))
+    )
+}
+
+use std::io;
+
+fn prompt(s: &str) -> io::Result<()> {
+    use std::io::{stdout, Write};
+    let stdout = stdout();
+    let mut stdout = stdout.lock();
+    stdout.write(s.as_bytes())?;
+    stdout.flush()
+}
+
+fn main() {
+    use std::io::{stdin, BufRead, BufReader};
+
+    let stdin = stdin();
+    let stdin = stdin.lock();
+    let stdin = BufReader::new(stdin);
+    let mut lines = stdin.lines();
+
+    loop {
+        prompt("> ").unwrap();
+        if let Some(Ok(line)) = lines.next() {
+            let token = lex(&line);
+            println!("{:?}", token);
+        } else {
+            break;
+        }
+    }
 }
