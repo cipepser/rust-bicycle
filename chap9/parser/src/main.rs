@@ -657,6 +657,55 @@ impl InterpreterError {
     }
 }
 
+struct RpnCompiler;
+
+impl RpnCompiler {
+    pub fn new() -> Self {
+        RpnCompiler
+    }
+
+    pub fn compile(&mut self, expr: &Ast) -> String {
+        let mut buf = String::new();
+        self.compile_inner(expr, &mut buf);
+        buf
+    }
+
+    pub fn compile_inner(&mut self, expr: &Ast, buf: &mut String) {
+        use self::AstKind::*;
+        match expr.value {
+            AstKind::Num(n) => buf.push_str(&n.to_string()),
+            AstKind::UniOp { ref op, ref e } => {
+                self.compile_uniop(op, buf);
+                self.compile_inner(e, buf)
+            }
+            AstKind::BinOp { ref op, ref l, ref r } => {
+                self.compile_inner(l, buf);
+                buf.push_str(" ");
+                self.compile_inner(r, buf);
+                buf.push_str(" ");
+                self.compile_binop(op, buf)
+            }
+        }
+    }
+
+    fn compile_uniop(&mut self, op: &UniOp, buf: &mut String) {
+        use self::UniOpKind::*;
+        match op.value {
+            UniOpKind::Plus => buf.push_str("+"),
+            UniOpKind::Minus => buf.push_str("-"),
+        }
+    }
+    fn compile_binop(&mut self, op: &BinOp, buf: &mut String) {
+        use self::BinOpKind::*;
+        match op.value {
+            BinOpKind::Add => buf.push_str("+"),
+            BinOpKind::Sub => buf.push_str("-"),
+            BinOpKind::Mult => buf.push_str("*"),
+            BinOpKind::Div => buf.push_str("/"),
+        }
+    }
+}
+
 use std::io;
 use std::str::FromStr;
 use std::fmt::Formatter;
@@ -673,6 +722,7 @@ fn main() {
     use std::io::{stdin, BufRead, BufReader};
 
     let mut interp = Interpreter::new();
+    let mut compiler = RpnCompiler::new();
 
     let stdin = stdin();
     let stdin = stdin.lock();
@@ -690,6 +740,7 @@ fn main() {
                     continue;
                 }
             };
+//            println!("{:?}", ast);
 
             let n = match interp.eval(&ast) {
                 Ok(n) => n,
@@ -699,8 +750,10 @@ fn main() {
                     continue;
                 }
             };
-
             println!("{}", n);
+
+            let rpn = compiler.compile(&ast);
+            println!("{}", rpn);
         } else {
             break;
         }
