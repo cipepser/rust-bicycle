@@ -429,7 +429,33 @@ fn test_parser() {
     )
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum Error {
+    Lexer(LexError),
+    Parser(ParseError),
+}
+
+impl From<LexError> for Error {
+    fn from(e: LexError) -> Self {
+        Error::Lexer(e)
+    }
+}
+
+impl From<ParseError> for Error {
+    fn from(e: ParseError) -> Self {}
+}
+
+impl FromStr for Ast {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let tokens = lex(s)?;
+        let ast = parse(tokens)?;
+        Ok(ast)
+    }
+}
+
 use std::io;
+use std::str::FromStr;
 
 fn prompt(s: &str) -> io::Result<()> {
     use std::io::{stdout, Write};
@@ -450,8 +476,13 @@ fn main() {
     loop {
         prompt("> ").unwrap();
         if let Some(Ok(line)) = lines.next() {
-            let token = lex(&line);
-            println!("{:?}", token);
+            let ast = match line.parse::<Ast>() {
+                Ok(ast) => ast,
+                Err(e) => {
+                    unimplemented!()
+                }
+            };
+            println!("{:?}", ast);
         } else {
             break;
         }
