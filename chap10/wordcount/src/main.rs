@@ -10,6 +10,6 @@ fn main() {
     let file = File::open(filename).unwrap();
     let reader = BufReader::new(&file);
 
-    let freqs = count(reader);
+    let freqs = count(reader, Default::default());
     println!("{:?}", freqs);
 }
