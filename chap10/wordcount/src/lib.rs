@@ -81,3 +81,37 @@ fn word_count_works2() {
 
     assert_eq!(count(Cursor::new("aa  cc dd"), CountOption::Word), exp)
 }
+
+#[test]
+#[should_panic]
+fn word_count_do_not_contain_unknown_words() {
+    use std::io::Cursor;
+
+    count(
+        Cursor::new([
+            b'a',
+            0xf0, 0x90, 0x80,
+            0xe3, 0x81, 0x82,
+        ]),
+        CountOption::Word,
+    );
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Cursor;
+
+    macro_rules! assert_map {
+        ($expr: expr, {$($key: expr => $value:expr),*}) => {
+            $(assert_eq!($expr[$key], $value));*
+        };
+    }
+
+    #[test]
+    fn word_count_works3() {
+        let freqs = count(Cursor::new("aa  cc dd"), CountOption::Word);
+        assert_eq!(freqs.len(), 3);
+        assert_map!(freqs, {"aa" => 1, "cc" => 1, "dd" => 1});
+    }
+}
