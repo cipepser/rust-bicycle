@@ -3,6 +3,13 @@ name = "wordcount"
 version = "0.1.0"
 authors = ["cipepser <respepic@gmail.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+description = "シンプルな文字、単語、行の出現頻度の計数機能を提供します。"
+readme = "README.md"
+repository = "https://github.com/cipepser/rust-bicycle/tree/master/chap10/wordcount"
+categories = ["command-line-utilities"]
+keywords = ["example", "frequency", "text"]
+exclude = ["text.txt", "texts/*"]
 
 [dependencies]
 regex = "1.0"
