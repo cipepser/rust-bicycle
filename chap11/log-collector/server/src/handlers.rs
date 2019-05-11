@@ -47,9 +47,18 @@ pub fn handle_get_logs(
     server: State<Server>,
     range: Query<api::logs::get::Query>,
 ) -> Result<HttpResponse, Error> {
-    debug!("{:?}", range);
+    use chrono::{DateTime, Utc};
 
-    let logs = Default::default();
+    let conn = server.pool.get()?;
+    let logs = db::logs(&conn, range.from, range.until)?;
+    let logs = logs
+        .into_iter()
+        .map(|log| api::Log {
+            user_agent: log.user_agent,
+            response_time: log.response_time,
+            timestamp: DateTime::from_utc(log.timestamp, Utc),
+        })
+        .collect();
 
     Ok(HttpResponse::Ok().json(api::logs::get::Response(logs)))
 }
