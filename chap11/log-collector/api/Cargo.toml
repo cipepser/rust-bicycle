@@ -9,5 +9,6 @@ serde = "1"
 serde_derive = "1"
 
 [dependencies.chrono]
-feature = ["serde"]
+features = ["serde"]
 version = "0.4"
+

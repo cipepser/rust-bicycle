@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use serde_derive::*;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
 pub struct Log {
@@ -34,7 +35,8 @@ pub mod logs {
         use serde_derive::*;
 
         pub type Query = DateTimeRange;
-
+        
+        #[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
         pub struct Response(pub Vec<Log>);
     }
 

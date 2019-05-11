@@ -1,7 +1,11 @@
+#[macro_use]
+extern crate diesel;
+
 use actix_web::App;
 use actix_web::http::Method;
 
 mod handlers;
+mod schema;
 
 #[derive(Clone)]
 pub struct Server {}
