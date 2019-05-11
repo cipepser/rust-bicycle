@@ -3,12 +3,24 @@ use failure::Error;
 use log::debug;
 
 use crate::Server;
+use crate::db;
 
 pub fn handle_post_logs(
     server: State<Server>,
     log: Json<api::logs::post::Request>,
 ) -> Result<HttpResponse, Error> {
-    debug!("{:?}", log);
+    use chrono::Utc;
+    use crate::models::NewLog;
+
+    let log: NewLog = NewLog {
+        user_agent: log.user_agent.clone(),
+        response_time: log.response_time,
+        timestamp: log.timestamp.unwrap_or_else(|| Utc::now()).naive_utc(),
+    };
+    let conn = server.pool.get()?;
+    db::insert_log(&conn, &log)?;
+
+    debug!("received log: {:?}", log);
     Ok(HttpResponse::Accepted().finish())
 }
 

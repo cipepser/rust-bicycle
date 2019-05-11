@@ -3,16 +3,30 @@ extern crate diesel;
 
 use actix_web::App;
 use actix_web::http::Method;
+use diesel::r2d2::{Pool, ConnectionManager};
+use diesel::pg::PgConnection;
+use dotenv::dotenv;
+use std::env;
 
 mod handlers;
 mod schema;
+mod models;
+mod db;
 
 #[derive(Clone)]
-pub struct Server {}
+pub struct Server {
+    pool: Pool<ConnectionManager<PgConnection>>,
+}
 
 impl Server {
     pub fn new() -> Self {
-        Server {}
+        dotenv().ok();
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set");
+        let manager = ConnectionManager::<PgConnection>::new(database_url);
+        let pool = Pool::builder()
+            .build(manager)
+            .expect("Failed to create pool.");
+        Server { pool }
     }
 }
 
