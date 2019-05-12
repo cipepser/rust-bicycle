@@ -34,10 +34,10 @@ pub fn app(server: Server) -> App<Server> {
     use crate::handlers::*;
 
     let app: App<Server> = App::with_state(server)
-        .route("logs", Method::POST, handle_post_logs)
-        .route("csv", Method::POST, handle_post_csv)
-        .route("csv", Method::GET, handle_get_csv)
-        .route("logs", Method::GET, handle_get_logs);
+        .route("/logs", Method::POST, handle_post_logs)
+        .route("/csv", Method::POST, handle_post_csv)
+        .route("/csv", Method::GET, handle_get_csv)
+        .route("/logs", Method::GET, handle_get_logs);
 
     app
 }
